@@ -1,6 +1,6 @@
 # MSB
 * **Description:**
-    > A program to backup you save profile for Monster Hunter: World.  
+    > A program to backup your save profile for Monster Hunter: World.  
 * **Usage:**
     > * Backup:
     > > 1. Click "CLICKME" twice, then the profile will be output to "MHW" directory.
