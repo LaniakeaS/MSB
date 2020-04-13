@@ -8,3 +8,5 @@
     > > 1. Use any text editor you want to open config/Path.
     > > 2. Copy the content and paste it to your File Explorer.
     > > 3. Copy and replace all files in MHW/remote/ to the folder that you just opened by last step.
+* **Warning:**
+    > It only worked on STEAM platform.
