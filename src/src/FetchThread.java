@@ -58,7 +58,7 @@ public class FetchThread extends Thread
 	{
 		for(String ele : beenThere)
 		{
-			if(ele.equals(PATH))
+			if(ele.equals(PATH) && !ele.equals(pathStack.get(0)))
 				return true;
 		}
 		
@@ -69,9 +69,11 @@ public class FetchThread extends Thread
 	public void run()
 	{	
 		for(; targetsPointer < targets.length && targetsPointer >= 0;)
-		{	
+		{
 			if(targets[targetsPointer].equals("*\\"))
 			{
+				boolean isBack = false;
+				
 				for(File file : new File(currentPath + useTarget).listFiles())
 				{
 					if(isBeenThere(file.toString() + "\\"))
@@ -86,6 +88,7 @@ public class FetchThread extends Thread
 						targetsContainer.add(targets[targetsPointer]);
 						targetsPointer++;
 						updateUseTarget();
+						isBack = false;
 						break;
 					}
 					else
@@ -96,7 +99,19 @@ public class FetchThread extends Thread
 						{
 							targetsContainer.remove(targetsContainer.size() - 1);
 							updateUseTarget();
+							isBack = true;
 						}
+					}
+				}
+				
+				if(isBack)
+				{
+					targetsPointer--;
+					
+					if(!targetsContainer.isEmpty())
+					{
+						targetsContainer.remove(targetsContainer.size() - 1);
+						updateUseTarget();
 					}
 				}
 			}
@@ -129,8 +144,13 @@ public class FetchThread extends Thread
 		boolean result = false;
 		File targetFile = new File(currentPath + useTarget + TARGET);
 		
-		if(targetFile.exists())
+		if(targetFile.exists() && !isBeenThere(currentPath + useTarget + TARGET))
+		{
+			beenThere.add(currentPath + useTarget + TARGET);
 			return true;
+		}
+		else if((targetsPointer - 1) % 2 == 1)
+			return false;
 		
 		File[] fileList = new File(currentPath + useTarget).listFiles();
 		
@@ -138,8 +158,9 @@ public class FetchThread extends Thread
 		{
 			for(File file : fileList)
 			{
-				if(file.isDirectory() && !isBeenThere(currentPath + file.getName() + "\\" + useTarget))
+				if(file.isDirectory() && !isBeenThere(file.toString()))
 				{
+					beenThere.add(file.toString());
 					pathStack.add(file.getName() + "\\");
 					updateCurrentPath();
 					
@@ -204,9 +225,6 @@ public class FetchThread extends Thread
 		
 		for(String path : pathStack)
 			currentPath += path;
-		
-		if(!beenThere.contains(currentPath + useTarget))
-			beenThere.add(currentPath + useTarget);
 	}
 	
 	private void updateUseTarget()
@@ -215,9 +233,6 @@ public class FetchThread extends Thread
 		
 		for(String target : targetsContainer)
 			useTarget += target;
-		
-		if(!beenThere.contains(currentPath + useTarget))
-			beenThere.add(currentPath + useTarget);
 	}
 	
 }

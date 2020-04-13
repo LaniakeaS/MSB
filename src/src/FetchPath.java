@@ -22,7 +22,10 @@ public final class FetchPath
 		threads = new ArrayList<FetchThread>();
 		
 		for(String root : roots)
-			threads.add(new FetchThread(root, target));
+		{
+			/*if(root.equals("E:\\"))*/
+				threads.add(new FetchThread(root, target));
+		}
 		
 		for(int i = 0; i < threads.size(); i++)
 		{
