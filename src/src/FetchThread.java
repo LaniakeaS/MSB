@@ -1,216 +1,198 @@
 package src;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EmptyStackException;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Stack;
 
 public class FetchThread extends Thread
 {
-	private String root;
-	
-	private String targets[];
-	private List<String> targetsContainer;
-	private int targetsPointer;
-	private String useTarget;
-	
-	private List<String> pathStack;
-	private String currentPath;
-	private List<String> beenThere;
-	
-	public static boolean isFound;
-	private FetchThread otherThreads[];
-	
-	public FetchThread(String ROOT, String TARGET)
+
+	protected boolean isFinished, isFound;
+	private Stack<String> beenThere, currentPath, searched, substitutes, unsearched;
+	private String currentPathString, root;
+
+
+	public FetchThread(String root, String targetPath)
 	{
-		root = new String(ROOT);
-		pathStack = new ArrayList<String>();
-		pathStack.add(root);
-		pathStack.add("");
-		currentPath = new String();
-		useTarget = "";
-		beenThere = new ArrayList<String>();
-		updateCurrentPath();
+		isFinished = false;
 		isFound = false;
-		String temp[] = TARGET.split("\\*\\\\");
-		targets = new String[2 * temp.length - 1];
-		
-		for(int i = 0, j = 0; i < targets.length && j < temp.length; i++)
-		{
-			if(i % 2 == 0)
-			{
-				targets[i] = temp[j];
-				j++;
-			}
-			else
-				targets[i] = "*\\";
-		}
-		
-		targetsPointer = 0;
-		targetsContainer = new ArrayList<String>();
+
+		beenThere = new Stack<String>();
+		currentPath = new Stack<String>();
+		searched = new Stack<String>();
+		substitutes = new Stack<String>();
+
+		unsearched = new Stack<String>();
+		List<String> temp = Arrays.asList(targetPath.split("/"));
+		Collections.reverse(temp);
+		unsearched.addAll(temp);
+
+		currentPathString = "";
+		this.root = root;
 	}
-	
-	private boolean isBeenThere(String PATH)
+
+
+	private void back()
 	{
-		for(String ele : beenThere)
+		if (searched.contains(currentPath.pop()))
 		{
-			if(ele.equals(PATH) && !ele.equals(pathStack.get(0)))
-				return true;
+			unsearched.push(searched.pop());
+
+			if (unsearched.peek().equals("*"))
+				substitutes.pop();
 		}
-		
-		return false;
 	}
-	
-	@Override
-	public void run()
-	{	
-		for(; targetsPointer < targets.length && targetsPointer >= 0;)
-		{
-			if(targets[targetsPointer].equals("*\\"))
-			{
-				boolean isBack = false;
-				
-				for(File file : new File(currentPath + useTarget).listFiles())
-				{
-					if(isBeenThere(file.toString() + "\\"))
-						continue;
-					
-					targetsContainer.add(file.getName() + "\\");
-					targetsPointer++;
-					updateUseTarget();
-					
-					if(search(targets[targetsPointer]))
-					{
-						targetsContainer.add(targets[targetsPointer]);
-						targetsPointer++;
-						updateUseTarget();
-						isBack = false;
-						break;
-					}
-					else
-					{
-						targetsPointer--;
-						
-						if(!targetsContainer.isEmpty())
-						{
-							targetsContainer.remove(targetsContainer.size() - 1);
-							updateUseTarget();
-							isBack = true;
-						}
-					}
-				}
-				
-				if(isBack)
-				{
-					targetsPointer--;
-					
-					if(!targetsContainer.isEmpty())
-					{
-						targetsContainer.remove(targetsContainer.size() - 1);
-						updateUseTarget();
-					}
-				}
-			}
-			else
-			{
-				if(search(targets[targetsPointer]))
-				{
-					targetsContainer.add(targets[targetsPointer]);
-					targetsPointer++;
-					updateUseTarget();
-				}
-				else
-				{
-					targetsPointer--;
-					
-					if(!targetsContainer.isEmpty())
-					{
-						targetsContainer.remove(targetsContainer.size() - 1);
-						updateUseTarget();
-					}
-				}
-			}
-		}
-		
-		stopHandle();
-	}
-	
-	private boolean search(String TARGET)
+
+
+	private void forward()
 	{
-		boolean result = false;
-		File targetFile = new File(currentPath + useTarget + TARGET);
-		
-		if(targetFile.exists() && !isBeenThere(currentPath + useTarget + TARGET))
+		File[] fileListOnCurrentPath = new File(root + currentPathString).listFiles();
+		boolean isLeft = false;
+
+		try
 		{
-			beenThere.add(currentPath + useTarget + TARGET);
-			return true;
-		}
-		else if((targetsPointer - 1) % 2 == 1)
-			return false;
-		
-		File[] fileList = new File(currentPath + useTarget).listFiles();
-		
-		if(fileList != null)
-		{
-			for(File file : fileList)
+			for (File file : fileListOnCurrentPath)
 			{
-				if(file.isDirectory() && !isBeenThere(file.toString()))
+				if (file.isDirectory() && !isBeenThere(file.getPath()) && !file.isHidden() && file.canExecute())
 				{
-					beenThere.add(file.toString());
-					pathStack.add(file.getName() + "\\");
-					updateCurrentPath();
-					
-					if(search(TARGET))
-					{
-						result = true;
-						break;
-					}
+					currentPath.push(file.getName());
+					beenThere.push(file.getPath());
+					isLeft = true;
+					break;
 				}
 			}
 		}
-		
-		if(!result)
+		catch (NullPointerException e)
 		{
-			pathStack.remove(pathStack.size() - 1);
-			updateCurrentPath();
 		}
 		
+		if (!isLeft)
+			back();
+	}
+
+
+	private String getPathFromStack(Stack<? extends String> stack)
+	{
+		String result = "";
+		Iterator<String> iterator = substitutes.iterator();
+
+		for (int i = 0; i < stack.size(); i++)
+		{
+			if (stack.get(i).equals("*"))
+				result += iterator.next();
+			else
+				result += stack.get(i);
+
+			if (i != stack.size() - 1)
+				result += "/";
+		}
+
 		return result;
 	}
-	
-	public void setOtherThreads(FetchThread OTHERTHREADS[])
+
+
+	private boolean isBeenThere(String path)
 	{
-		otherThreads = OTHERTHREADS;
+		if (beenThere.contains(path))
+			return true;
+
+		return false;
 	}
-	
-	private synchronized void stopHandle()
+
+
+	private void setIsFinished(boolean isFinished)
 	{
-		if(targetsPointer >= targets.length)
+		this.isFinished = isFinished;
+	}
+
+
+	private void setIsFound(boolean isFound)
+	{
+		this.isFound = isFound;
+	}
+
+
+	private void traverse()
+	{
+		try
 		{
-			for(FetchThread otherThread : otherThreads)
-				otherThread.stop();
-			
-			write();
-			isFound = true;
+			String currentTarget = unsearched.peek();
+			currentPathString = getPathFromStack(currentPath);
+
+			if (currentTarget.equals("*"))
+			{
+				File[] fileListOnCurrentPath = new File(root + currentPathString).listFiles();
+				boolean isLeft = false;
+
+				for (File file : fileListOnCurrentPath)
+				{
+					if (file.isDirectory() && !isBeenThere(file.getPath()))
+					{
+						currentTarget = file.getName();
+						substitutes.push(currentTarget);
+						isLeft = true;
+						break;
+					}
+				}
+
+				if (!isLeft)
+				{
+					back();
+					return;
+				}
+			}
+
+			File targetFile = new File(root + currentPathString + "/" + currentTarget);
+
+			if
+			(
+				targetFile.exists() &&
+				(
+					(unsearched.size() != 1 && targetFile.isDirectory()) ||
+					(unsearched.size() == 1)
+				) &&
+				!isBeenThere(targetFile.getPath())
+			)
+			{
+				searched.push(unsearched.pop());
+				currentPath.push(searched.peek());
+				beenThere.push(targetFile.getPath());
+			}
+			else if (unsearched.peek().equals("*") || searched.size() == 0)
+				forward();
+			else
+				back();
+		}
+		catch (EmptyStackException e)
+		{
+			if (unsearched.isEmpty())
+				setIsFound(true);
+
+			if (currentPath.isEmpty())
+				setIsFinished(true);
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			System.out.println(currentPathString);
+			System.exit(-1);
 		}
 	}
-	
-	private synchronized void write()
+
+
+	private void write()
 	{
 		try
 		{
 			FileOutputStream out = new FileOutputStream(new File("config/Path"));
-			out.write((currentPath + useTarget).getBytes());
+			out.write((root + currentPathString + "/" + searched.peek()).getBytes());
 			out.close();
-		}
-		catch (FileNotFoundException e)
-		{
-			e.printStackTrace();
-			System.exit(-1);
 		}
 		catch (IOException e)
 		{
@@ -218,21 +200,23 @@ public class FetchThread extends Thread
 			System.exit(-1);
 		}
 	}
-	
-	private void updateCurrentPath()
+
+
+	@Override
+	public void run()
 	{
-		currentPath = "";
-		
-		for(String path : pathStack)
-			currentPath += path;
+		while (!isFound && !isFinished)
+			traverse();
+
+		if (isFound)
+		{
+			synchronized(this)
+			{
+				write();
+			}
+		}
+		else
+			System.out.println(root + " NOT FOUND");
 	}
-	
-	private void updateUseTarget()
-	{
-		useTarget = "";
-		
-		for(String target : targetsContainer)
-			useTarget += target;
-	}
-	
+
 }

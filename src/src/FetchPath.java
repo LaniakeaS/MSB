@@ -2,14 +2,13 @@ package src;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public final class FetchPath
 {
 	private static List<FetchThread> threads;
 	private static List<String> roots;
-	private static final String target = "Steam\\userdata\\*\\582010\\remote\\";
+	private static final String target = "Steam/userdata/*/582010/remote/";
 	
 	private FetchPath() throws InterruptedException
 	{
@@ -22,23 +21,7 @@ public final class FetchPath
 		threads = new ArrayList<FetchThread>();
 		
 		for(String root : roots)
-		{
-			/*if(root.equals("E:\\"))*/
-				threads.add(new FetchThread(root, target));
-		}
-		
-		for(int i = 0; i < threads.size(); i++)
-		{
-			FetchThread otherThreads[] = new FetchThread[threads.size() - 1];
-			
-			for(int j = i + 1, pointer = 0; j != i && pointer < otherThreads.length; j++, pointer++)
-			{
-				j = j >= threads.size() ? 0 : j;
-				otherThreads[pointer] = threads.get(j);
-			}
-			
-			threads.get(i).setOtherThreads(otherThreads);
-		}
+			threads.add(new FetchThread(root, target));
 		
 		for(FetchThread thread : threads)
 			thread.start();
@@ -47,9 +30,9 @@ public final class FetchPath
 		{
 			i = i == threads.size() ? 0 : i;
 			
-			if(!threads.get(i).isAlive() && FetchThread.isFound)
+			if(!threads.get(i).isAlive() && threads.get(i).isFound)
 			{
-				FetchThread.isFound = false;
+				threads.get(i).isFound = false;
 				
 				for(FetchThread thread : threads)
 					thread.stop();
@@ -62,7 +45,7 @@ public final class FetchPath
 			for(FetchThread thread : threads)
 				isAllDead = isAllDead & !thread.isAlive();
 			
-			if(isAllDead && !FetchThread.isFound)
+			if(isAllDead && !threads.get(i).isFound)
 			{
 				System.out.println("Not Found!");
 				System.exit(-1);
